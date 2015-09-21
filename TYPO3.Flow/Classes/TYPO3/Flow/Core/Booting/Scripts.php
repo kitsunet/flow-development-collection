@@ -13,6 +13,7 @@ namespace TYPO3\Flow\Core\Booting;
 
 use TYPO3\Flow\Annotations as Flow;
 use TYPO3\Flow\Core\Bootstrap;
+use TYPO3\Flow\Core\ClassLoader;
 use TYPO3\Flow\Monitor\FileMonitor;
 use TYPO3\Flow\Package\Package;
 use TYPO3\Flow\Package\PackageInterface;
@@ -34,7 +35,9 @@ class Scripts {
 	 */
 	static public function initializeClassLoader(Bootstrap $bootstrap) {
 		require_once(FLOW_PATH_FLOW . 'Classes/TYPO3/Flow/Core/ClassLoader.php');
-		$classLoader = new \TYPO3\Flow\Core\ClassLoader($bootstrap->getContext());
+		$classLoader = new \TYPO3\Flow\Core\ClassLoader($bootstrap->getContext(), [
+			['namespace' => 'TYPO3\\Flow', 'classPath' => FLOW_PATH_FLOW . 'Classes/', 'mappingType' => ClassLoader::MAPPING_TYPE_PSR0]
+		]);
 		spl_autoload_register(array($classLoader, 'loadClass'), TRUE, TRUE);
 		$bootstrap->setEarlyInstance(\TYPO3\Flow\Core\ClassLoader::class, $classLoader);
 		if ($bootstrap->getContext()->isTesting()) {
@@ -409,7 +412,11 @@ class Scripts {
 			if ($packageManager->isPackageFrozen($packageKey)) {
 				continue;
 			}
-			self::monitorDirectoryIfItExists($fileMonitors['Flow_ClassFiles'], $package->getClassesPath(), '\.php$');
+
+			foreach ($package->getAutoloadPaths() as $autoloadPath) {
+				self::monitorDirectoryIfItExists($fileMonitors['Flow_ClassFiles'], $autoloadPath, '\.php$');
+			}
+
 			self::monitorDirectoryIfItExists($fileMonitors['Flow_ConfigurationFiles'], $package->getConfigurationPath(), '\.yaml$');
 			self::monitorDirectoryIfItExists($fileMonitors['Flow_TranslationFiles'], $package->getResourcesPath() . 'Private/Translations/', '\.xlf');
 			if ($context->isTesting() && $package instanceof Package) {
@@ -417,7 +424,6 @@ class Scripts {
 				self::monitorDirectoryIfItExists($fileMonitors['Flow_ClassFiles'], $package->getFunctionalTestsPath(), '\.php$');
 			}
 		}
-
 		self::monitorDirectoryIfItExists($fileMonitors['Flow_ConfigurationFiles'], FLOW_PATH_CONFIGURATION, '\.yaml$');
 
 		foreach ($fileMonitors as $fileMonitor) {

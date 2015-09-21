@@ -13,6 +13,7 @@ namespace TYPO3\Flow\Command;
 
 use TYPO3\Flow\Annotations as Flow;
 use TYPO3\Flow\Cli\CommandController;
+use TYPO3\Flow\Composer\Utility as ComposerUtility;
 use TYPO3\Flow\Core\Booting\Scripts;
 use TYPO3\Flow\Core\Bootstrap;
 use TYPO3\Flow\Package\PackageInterface;
@@ -62,7 +63,7 @@ class PackageCommandController extends CommandController {
 	 * @return string
 	 * @see typo3.kickstart:kickstart:package
 	 */
-	public function createCommand($packageKey, $packageType = 'typo3-flow-package') {
+	public function createCommand($packageKey, $packageType = PackageInterface::DEFAULT_COMPOSER_TYPE) {
 		if (!$this->packageManager->isPackageKeyValid($packageKey)) {
 			$this->outputLine('The package key "%s" is not valid.', array($packageKey));
 			$this->quit(1);
@@ -71,11 +72,11 @@ class PackageCommandController extends CommandController {
 			$this->outputLine('The package "%s" already exists.', array($packageKey));
 			$this->quit(1);
 		}
-		if (substr($packageType, 0, 11) !== 'typo3-flow-') {
+		if (ComposerUtility::isFlowPackageType($packageType)) {
 			$this->outputLine('The package must be a Flow package, but "%s" is not a valid Flow package type.', array($packageKey));
 			$this->quit(1);
 		}
-		$package = $this->packageManager->createPackage($packageKey, NULL, NULL, $packageType);
+		$package = $this->packageManager->createPackage($packageKey, ['type' => $packageType], NULL);
 		$this->outputLine('Created new package "' . $packageKey . '" at "' . $package->getPackagePath() . '".');
 	}
 
@@ -190,9 +191,8 @@ class PackageCommandController extends CommandController {
 		$this->outputLine('ACTIVE PACKAGES:');
 		/** @var PackageInterface $package */
 		foreach ($activePackages as $package) {
-			$packageMetaData = $package->getPackageMetaData();
 			$frozenState = ($freezeSupported && isset($frozenPackages[$package->getPackageKey()]) ? '* ' : '  ' );
-			$this->outputLine(' ' . str_pad($package->getPackageKey(), $longestPackageKey + 3) . $frozenState . str_pad($packageMetaData->getVersion(), 15));
+			$this->outputLine(' ' . str_pad($package->getPackageKey(), $longestPackageKey + 3) . $frozenState . str_pad($package->getInstalledVersion(), 15));
 		}
 
 		if (count($inactivePackages) > 0) {
@@ -200,8 +200,7 @@ class PackageCommandController extends CommandController {
 			$this->outputLine('INACTIVE PACKAGES:');
 			foreach ($inactivePackages as $package) {
 				$frozenState = (isset($frozenPackages[$package->getPackageKey()]) ? '* ' : '  ' );
-				$packageMetaData = $package->getPackageMetaData();
-				$this->outputLine(' ' . str_pad($package->getPackageKey(), $longestPackageKey + 3) . $frozenState . str_pad($packageMetaData->getVersion(), 15));
+				$this->outputLine(' ' . str_pad($package->getPackageKey(), $longestPackageKey + 3) . $frozenState . str_pad($package->getInstalledVersion(), 15));
 			}
 		}
 
@@ -392,5 +391,20 @@ class PackageCommandController extends CommandController {
 
 		Scripts::executeCommand('typo3.flow:cache:flush', $this->settings, FALSE);
 		$this->sendAndExit(0);
+	}
+
+	/**
+	 * Rescan package availability and recreates the PackageStates configuration.
+	 */
+	public function rescanCommand() {
+		$packageStates = $this->packageManager->rescanPackages();
+
+		$this->outputLine('The following packages are registered and will be loaded in this order:');
+		$this->outputLine('');
+		foreach ($packageStates['packages'] as $composerName => $packageState) {
+			$this->outputLine($composerName);
+		}
+		$this->outputLine('');
+		$this->outputLine('Package rescan successful.');
 	}
 }

@@ -1,5 +1,5 @@
 <?php
-namespace TYPO3\Flow\Package\MetaData;
+namespace TYPO3\Flow\Composer\Exception;
 
 /*                                                                        *
  * This script belongs to the TYPO3 Flow framework.                       *
@@ -11,18 +11,11 @@ namespace TYPO3\Flow\Package\MetaData;
  * The TYPO3 project - inspiring people to share!                         *
  *                                                                        */
 
-
 /**
- * Package constraint meta model
+ * An "Invalid Package Key" exception
  *
+ * @api
  */
-class PackageConstraint extends \TYPO3\Flow\Package\MetaData\AbstractConstraint {
+class MissingPackageManifestException extends \TYPO3\Flow\Package\Exception {
 
-	/**
-	 * @return string The constraint scope
-	 * @see \TYPO3\Flow\Package\MetaData\Constraint::getConstraintScope()
-	 */
-	public function getConstraintScope() {
-		return \TYPO3\Flow\Package\MetaDataInterface::CONSTRAINT_SCOPE_PACKAGE;
-	}
 }

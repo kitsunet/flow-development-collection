@@ -15,6 +15,7 @@ use TYPO3\Flow\Core\ApplicationContext;
 use TYPO3\Flow\Core\Bootstrap;
 use TYPO3\Flow\Package\PackageInterface;
 use org\bovigo\vfs\vfsStream;
+use TYPO3\Flow\Package\PackageManager;
 use TYPO3\Flow\SignalSlot\Dispatcher;
 
 /**
@@ -296,7 +297,8 @@ class PackageManagerTest extends \TYPO3\Flow\Tests\UnitTestCase {
 				'packagePath' => 'Application/' . $packageKey . '/',
 				'classesPath' => 'Classes/',
 				'manifestPath' => '',
-				'composerName' => $packageKey
+				'composerName' => $packageKey,
+				'packageClassInformation' => array()
 			);
 		}
 
@@ -902,6 +904,58 @@ class PackageManagerTest extends \TYPO3\Flow\Tests\UnitTestCase {
 
 		$this->mockDispatcher->expects($this->once())->method('dispatch')->with(\TYPO3\Flow\Package\PackageManager::class, 'packageStatesUpdated');
 		$this->packageManager->unfreezePackage('Some.Package');
+	}
+
+	/**
+	 * @test
+	 */
+	public function detectPackageClassesPathUsesDefaultClassesIfNoPsrMappingExists() {
+		$packageManager = $this->getAccessibleMock(PackageManager::class, array('dummy'), array(), '', FALSE);
+		$packagePath = 'vfs://Test/Packages/Vendor.TestPackage4123/';
+		mkdir($packagePath, 0777, TRUE);
+		file_put_contents($packagePath . 'composer.json', '{"name": "vendor/testpackage4123", "type": "flow-test"}');
+		$classesPath = $packageManager->_call('detectPackageClassesPath', $packagePath);
+
+		$this->assertSame('Classes/', $classesPath);
+	}
+
+	/**
+	 * @test
+	 */
+	public function detectPackageClassesPathUsesClassesPathAccordingToThePsr0MappingIfItExists() {
+		$packageManager = $this->getAccessibleMock(PackageManager::class, array('dummy'), array(), '', FALSE);
+		$packagePath = 'vfs://Test/Packages/Vendor.TestPackage3412/';
+		mkdir($packagePath, 0777, TRUE);
+		file_put_contents($packagePath . 'composer.json', '{"name": "vendor/testpackage3412", "type": "flow-test", "autoload": { "psr-0": { "Psr0Namespace": "Psr0/Path" }, "psr-4": { "Psr4Namespace": "Psr4/Path" } }}');
+		$classesPath = $packageManager->_call('detectPackageClassesPath', $packagePath);
+
+		$this->assertSame('Psr0/Path/', $classesPath);
+	}
+
+	/**
+	 * @test
+	 */
+	public function detectPackageClassesPathUsesClassesPathAccordingToThePsr4MappingIfItExists() {
+		$packageManager = $this->getAccessibleMock(PackageManager::class, array('dummy'), array(), '', FALSE);
+		$packagePath = 'vfs://Test/Packages/Vendor.TestPackage2341/';
+		mkdir($packagePath, 0777, TRUE);
+		file_put_contents($packagePath . 'composer.json', '{"name": "vendor/testpackage2341", "type": "flow-test", "autoload": { "psr-4": { "Psr4Namespace": "Psr4/Path" } }}');
+		$classesPath = $packageManager->_call('detectPackageClassesPath', $packagePath);
+
+		$this->assertSame('Psr4/Path/', $classesPath);
+	}
+
+	/**
+	 * @test
+	 */
+	public function detectPackageClassesPathUsesClassesPathFromFirstConfiguredPsr0Mapping() {
+		$packageManager = $this->getAccessibleMock(PackageManager::class, array('dummy'), array(), '', FALSE);
+		$packagePath = 'vfs://Test/Packages/Vendor.TestPackage1234/';
+		mkdir($packagePath, 0777, TRUE);
+		file_put_contents($packagePath . 'composer.json', '{"name": "vendor/testpackage1234", "type": "flow-test", "autoload": { "psr-0": { "Psr0Namespace": ["Psr0/Path", "Psr0/Foo"] } }}');
+		$classesPath = $packageManager->_call('detectPackageClassesPath', $packagePath);
+
+		$this->assertSame('Psr0/Path/', $classesPath);
 	}
 
 }
