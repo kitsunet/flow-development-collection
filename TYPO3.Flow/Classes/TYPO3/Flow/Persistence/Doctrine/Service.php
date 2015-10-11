@@ -186,21 +186,32 @@ class Service
         $configuration->setMigrationsDirectory(\TYPO3\Flow\Utility\Files::concatenatePaths(array(FLOW_PATH_DATA, 'DoctrineMigrations')));
         $configuration->setMigrationsTableName(self::DOCTRINE_MIGRATIONSTABLENAME);
 
-        $configuration->createMigrationTable();
+        $migrationTableCreated = $configuration->createMigrationTable();
+        if ($migrationTableCreated === true) {
+            $this->emitMigrationTableWasCreated();
+        }
 
         $databasePlatformName = $this->getDatabasePlatformName();
         foreach ($this->packageManager->getActivePackages() as $package) {
-            $path = \TYPO3\Flow\Utility\Files::concatenatePaths(array(
+            $path = \TYPO3\Flow\Utility\Files::concatenatePaths([
                 $package->getPackagePath(),
                 'Migrations',
                 $databasePlatformName
-            ));
+            ]);
             if (is_dir($path)) {
                 $configuration->registerMigrationsFromDirectory($path);
             }
         }
 
         return $configuration;
+    }
+
+    /**
+     * @return void
+     * @Flow\Signal
+     */
+    protected function emitMigrationTableWasCreated()
+    {
     }
 
     /**

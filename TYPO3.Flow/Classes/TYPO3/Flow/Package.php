@@ -112,6 +112,7 @@ class Package extends BasePackage
         });
         $dispatcher->connect(\TYPO3\Flow\Command\CacheCommandController::class, 'warmupCaches', \TYPO3\Flow\Configuration\ConfigurationManager::class, 'warmup');
 
+        $dispatcher->connect(\TYPO3\Flow\Persistence\Doctrine\Service::class, 'migrationTableWasCreated', 'TYPO3\Flow\Security\Policy\PolicyService', 'reset');
         $dispatcher->connect(\TYPO3\Fluid\Core\Parser\TemplateParser::class, 'initializeNamespaces', function (TemplateParser $templateParser) use ($bootstrap) {
             /** @var PackageManagerInterface $packageManager */
             $packageManager = $bootstrap->getEarlyInstance(\TYPO3\Flow\Package\PackageManagerInterface::class);
