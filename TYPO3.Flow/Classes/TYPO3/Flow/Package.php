@@ -95,6 +95,7 @@ class Package extends BasePackage
         $dispatcher->connect(\TYPO3\Flow\Core\Bootstrap::class, 'bootstrapShuttingDown', \TYPO3\Flow\Reflection\ReflectionService::class, 'saveToCache');
 
         $dispatcher->connect(\TYPO3\Flow\Command\CoreCommandController::class, 'finishedCompilationRun', \TYPO3\Flow\Security\Authorization\Privilege\Method\MethodPrivilegePointcutFilter::class, 'savePolicyCache');
+        $dispatcher->connect(\TYPO3\Flow\Command\CoreCommandController::class, 'finishedCompilationRun', \TYPO3\Flow\Aop\Pointcut\RuntimeExpressionEvaluator::class, 'saveRuntimeExpressions');
 
         $dispatcher->connect(\TYPO3\Flow\Security\Authentication\AuthenticationProviderManager::class, 'authenticatedToken', function () use ($bootstrap) {
             $session = $bootstrap->getObjectManager()->get(\TYPO3\Flow\Session\SessionInterface::class);
