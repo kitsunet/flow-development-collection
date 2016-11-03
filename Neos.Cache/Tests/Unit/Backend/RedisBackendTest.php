@@ -14,6 +14,8 @@ include_once(__DIR__ . '/../../BaseTestCase.php');
  */
 
 use Neos\Cache\Backend\RedisBackend;
+use Neos\Cache\EnvironmentConfiguration;
+use TYPO3\Flow\Cache\Frontend\FrontendInterface;
 use TYPO3\Flow\Cache\Tests\BaseTestCase;
 
 /**
@@ -51,12 +53,12 @@ class RedisBackendTest extends BaseTestCase
         }
 
         $this->redis = $this->getMockBuilder(\Redis::class)->disableOriginalConstructor()->getMock();
-        $this->cache = $this->createMock(\TYPO3\Flow\Cache\Frontend\FrontendInterface::class);
+        $this->cache = $this->createMock(FrontendInterface::class);
         $this->cache->expects($this->any())
             ->method('getIdentifier')
             ->will($this->returnValue('Foo_Cache'));
 
-        $mockEnvironmentConfiguration = $this->getMockBuilder(\Neos\Cache\EnvironmentConfiguration::class)->setConstructorArgs([
+        $mockEnvironmentConfiguration = $this->getMockBuilder(EnvironmentConfiguration::class)->setConstructorArgs([
             __DIR__ . '~Testing',
             'vfs://Foo/',
             255

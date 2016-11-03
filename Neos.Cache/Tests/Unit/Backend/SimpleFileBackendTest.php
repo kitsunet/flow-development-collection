@@ -106,8 +106,6 @@ class SimpleFileBackendTest extends BaseTestCase
             5
         );
 
-        $mockCacheManager = $this->getMockBuilder(\TYPO3\Flow\Cache\CacheManager::class)->disableOriginalConstructor()->getMock();
-
         $entryIdentifier = 'BackendFileTest';
 
         $backend = $this->getMockBuilder(SimpleFileBackend::class)->setMethods(['setTag', 'writeCacheFile'])->disableOriginalConstructor()->getMock();
