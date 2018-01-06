@@ -1,7 +1,7 @@
 <?php
 namespace Neos\Cache\Frontend;
 
-use Neos\Cache\Psr\InvalidArgumentException;
+use Neos\Cache\Exception\PsrInvalidArgumentException;
 use Neos\Cache\Psr\PsrCacheItem;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -23,12 +23,12 @@ class PsrFrontend extends VariableFrontend implements CacheItemPoolInterface
      *
      * @param string $key
      * @return CacheItemInterface
-     * @throws InvalidArgumentException
+     * @throws PsrInvalidArgumentException
      */
     public function getItem($key)
     {
         if (!$this->isValidEntryIdentifier($key)) {
-            throw new InvalidArgumentException('"' . $key . '" is not a valid cache entry identifier.', 1514738649629);
+            throw new PsrInvalidArgumentException('"' . $key . '" is not a valid cache entry identifier.', 1514738649629);
         }
 
         $rawResult = $this->backend->get($key);
@@ -45,7 +45,7 @@ class PsrFrontend extends VariableFrontend implements CacheItemPoolInterface
      *
      * @param string[] $keys
      * @return array
-     * @throws InvalidArgumentException
+     * @throws PsrInvalidArgumentException
      */
     public function getItems(array $keys = [])
     {
@@ -59,12 +59,12 @@ class PsrFrontend extends VariableFrontend implements CacheItemPoolInterface
      *
      * @param string $key
      * @return bool
-     * @throws InvalidArgumentException
+     * @throws PsrInvalidArgumentException
      */
     public function hasItem($key)
     {
         if (!$this->isValidEntryIdentifier($key)) {
-            throw new InvalidArgumentException('"' . $key . '" is not a valid cache entry identifier.', 1514738924982);
+            throw new PsrInvalidArgumentException('"' . $key . '" is not a valid cache entry identifier.', 1514738924982);
         }
 
         return $this->backend->has($key);
@@ -86,12 +86,12 @@ class PsrFrontend extends VariableFrontend implements CacheItemPoolInterface
      *
      * @param string $key
      * @return bool
-     * @throws InvalidArgumentException
+     * @throws PsrInvalidArgumentException
      */
     public function deleteItem($key)
     {
         if (!$this->isValidEntryIdentifier($key)) {
-            throw new InvalidArgumentException('"' . $key . '" is not a valid cache entry identifier.', 1514741469583);
+            throw new PsrInvalidArgumentException('"' . $key . '" is not a valid cache entry identifier.', 1514741469583);
         }
 
         return $this->remove($key);
@@ -102,7 +102,7 @@ class PsrFrontend extends VariableFrontend implements CacheItemPoolInterface
      *
      * @param string[] $keys
      * @return bool
-     * @throws InvalidArgumentException
+     * @throws PsrInvalidArgumentException
      */
     public function deleteItems(array $keys)
     {

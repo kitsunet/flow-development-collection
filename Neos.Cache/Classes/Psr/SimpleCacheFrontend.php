@@ -1,5 +1,5 @@
 <?php
-namespace Neos\Cache\Frontend;
+namespace Neos\Cache\Psr;
 
 use Neos\Cache\Backend\BackendInterface;
 use Neos\Cache\Exception;
@@ -9,7 +9,7 @@ use Psr\SimpleCache\DateInterval;
 /**
  *
  */
-class PsrSimpleCacheFrontend implements CacheInterface
+class SimpleCacheFrontend implements CacheInterface
 {
     /**
      * Pattern an entry identifier must match.
@@ -123,9 +123,11 @@ class PsrSimpleCacheFrontend implements CacheInterface
      */
     public function getMultiple($keys, $default = null)
     {
-        return array_map(function ($key) use ($default) {
-            return $this->get($key, $default);
-        }, $keys);
+        $result = [];
+        foreach ($keys as $key) {
+            $result[$key] = $this->get($key, $default);
+        }
+        return $result;
     }
 
     /**
@@ -152,9 +154,9 @@ class PsrSimpleCacheFrontend implements CacheInterface
      */
     public function deleteMultiple($keys)
     {
-        array_map(function ($key) {
+        foreach($keys as $key) {
             $this->delete($key);
-        }, $keys);
+        };
 
         return true;
     }

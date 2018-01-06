@@ -15,7 +15,6 @@ include_once(__DIR__ . '/../../BaseTestCase.php');
 
 use Neos\Cache\Backend\AbstractBackend;
 use Neos\Cache\Frontend\PsrFrontend;
-use Neos\Cache\Psr\InvalidArgumentException;
 use Neos\Cache\Psr\PsrCacheItem;
 use Neos\Cache\Tests\BaseTestCase;
 
@@ -26,7 +25,7 @@ use Neos\Cache\Tests\BaseTestCase;
 class PsrFrontendTest extends BaseTestCase
 {
     /**
-     * @expectedException InvalidArgumentException
+     * @expectedException \Neos\Cache\Exception\PsrInvalidArgumentException
      * @test
      */
     public function getItemChecksIfTheIdentifierIsValid()
