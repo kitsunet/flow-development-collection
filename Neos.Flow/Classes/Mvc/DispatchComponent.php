@@ -14,13 +14,13 @@ namespace Neos\Flow\Mvc;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Http\Component\ComponentContext;
 use Neos\Flow\Http\Component\ComponentInterface;
-use Neos\Flow\Http\Request as HttpRequest;
 use Neos\Flow\ObjectManagement\ObjectManagerInterface;
 use Neos\Flow\Property\PropertyMapper;
 use Neos\Flow\Property\PropertyMappingConfiguration;
 use Neos\Flow\Property\TypeConverter\MediaTypeConverterInterface;
 use Neos\Flow\Security\Context;
 use Neos\Utility\Arrays;
+use Psr\Http\Message\RequestInterface as HttpRequestInterface;
 
 /**
  * A dispatch component
@@ -76,8 +76,10 @@ class DispatchComponent implements ComponentInterface
     {
         $componentContext = $this->prepareActionRequest($componentContext);
         $actionRequest = $componentContext->getParameter(DispatchComponent::class, 'actionRequest');
+        $actionResponse = ActionResponse::createFromHttpResponse($componentContext->getHttpResponse());
         $this->setDefaultControllerAndActionNameIfNoneSpecified($actionRequest);
-        $this->dispatcher->dispatch($actionRequest, $componentContext->getHttpResponse());
+        $this->dispatcher->dispatch($actionRequest, $actionResponse);
+        $componentContext->replaceHttpResponse($actionResponse->getHttpResponse());
     }
 
     /**
@@ -120,10 +122,10 @@ class DispatchComponent implements ComponentInterface
     /**
      * Parses the request body according to the media type.
      *
-     * @param HttpRequest $httpRequest
+     * @param HttpRequestInterface $httpRequest
      * @return array
      */
-    protected function parseRequestBody(HttpRequest $httpRequest)
+    protected function parseRequestBody(HttpRequestInterface $httpRequest)
     {
         $requestBody = $httpRequest->getContent();
         if ($requestBody === null || $requestBody === '') {

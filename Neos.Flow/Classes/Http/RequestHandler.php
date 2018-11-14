@@ -18,7 +18,9 @@ use Neos\Flow\Http\Component\ComponentChain;
 use Neos\Flow\Http\Component\ComponentContext;
 use Neos\Flow\ObjectManagement\ObjectManagerInterface;
 use Neos\Flow\Package\PackageManagerInterface;
+use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 
 /**
  * A request handler which can handle HTTP requests.
@@ -41,6 +43,11 @@ class RequestHandler implements HttpRequestHandlerInterface
      * @var Component\ComponentContext
      */
     protected $componentContext;
+
+    /**
+     * @var ResponseSender
+     */
+    protected $responseSender;
 
     /**
      * Make exit() a closure so it can be manipulated during tests
@@ -97,19 +104,17 @@ class RequestHandler implements HttpRequestHandlerInterface
 
         $this->boot();
         $this->resolveDependencies();
+
+        $request = $this->applyBaseUriSetting($request);
+        $this->componentContext->replaceHttpRequest($request);
+
         $response = $this->addPoweredByHeader($response);
         $this->componentContext->replaceHttpResponse($response);
-        $baseUriSetting = $this->bootstrap->getObjectManager()->get(ConfigurationManager::class)->getConfiguration(ConfigurationManager::CONFIGURATION_TYPE_SETTINGS, 'Neos.Flow.http.baseUri');
-        if (!empty($baseUriSetting)) {
-            $baseUri = new Uri($baseUriSetting);
-            $request = $request->withAttribute(Request::ATTRIBUTE_BASE_URI, $baseUri);
-            $this->componentContext->replaceHttpRequest($request);
-        }
 
         $this->baseComponentChain->handle($this->componentContext);
         $response = $this->baseComponentChain->getResponse();
 
-        $response->send();
+        $this->responseSender->send($response);
 
         $this->bootstrap->shutdown(Bootstrap::RUNLEVEL_RUNTIME);
         $this->exit->__invoke();
@@ -118,7 +123,7 @@ class RequestHandler implements HttpRequestHandlerInterface
     /**
      * Returns the currently handled HTTP request
      *
-     * @return Request
+     * @return ServerRequestInterface
      * @api
      */
     public function getHttpRequest()
@@ -129,7 +134,7 @@ class RequestHandler implements HttpRequestHandlerInterface
     /**
      * Returns the HTTP response corresponding to the currently handled request
      *
-     * @return Response
+     * @return ResponseInterface
      * @api
      */
     public function getHttpResponse()
@@ -158,7 +163,28 @@ class RequestHandler implements HttpRequestHandlerInterface
     protected function resolveDependencies()
     {
         $objectManager = $this->bootstrap->getObjectManager();
+        $this->responseSender = $objectManager->get(ResponseSender::class);
         $this->baseComponentChain = $objectManager->get(ComponentChain::class);
+    }
+
+    /**
+     * Checks if a baseUri setting is available and applies it to the request.
+     *
+     * @param RequestInterface $request
+     * @return RequestInterface
+     * @throws \Neos\Flow\Exception
+     */
+    protected function applyBaseUriSetting(RequestInterface $request): RequestInterface
+    {
+        $baseUriSetting = $this->bootstrap->getObjectManager()->get(ConfigurationManager::class)->getConfiguration(ConfigurationManager::CONFIGURATION_TYPE_SETTINGS, 'Neos.Flow.http.baseUri');
+        if (empty($baseUriSetting)) {
+            return $request;
+        }
+
+        $baseUri = new Uri($baseUriSetting);
+        $request = $request->withAttribute(Request::ATTRIBUTE_BASE_URI, $baseUri);
+
+        return $request;
     }
 
     /**

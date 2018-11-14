@@ -16,7 +16,7 @@ use Neos\Flow\Annotations as Flow;
 /**
  * Container for HTTP header fields
  *
- * @deprecated Headers will be only accessed via request in the future, if this class stays, then as internal implementation detail.
+ * @internal Headers will be only accessed via request in the future, if this class stays, then as internal implementation detail.
  * @Flow\Proxy(false)
  * TODO: case-insensitive header name matching
  */
@@ -25,7 +25,7 @@ class Headers implements \Iterator
     /**
      * @var array
      */
-    protected $fields = ['Cache-Control' => []];
+    protected $fields = ['Cache-Control' => [], 'Set-Cookie' => []];
 
     /**
      * @var array
@@ -567,7 +567,7 @@ class Headers implements \Iterator
      */
     public function current()
     {
-        return $this->getRaw($this>key());
+        return $this->getRaw($this->key());
     }
 
     /**
@@ -600,5 +600,20 @@ class Headers implements \Iterator
     public function rewind()
     {
         reset($this->fields);
+    }
+
+    /**
+     * Returns raw header values as map with keys being the header names and value being an array of values or a single value.
+     *
+     * @return array
+     */
+    public function toArray(): array
+    {
+        $headers = [];
+        foreach (array_keys($this->fields) as $headerName) {
+            $headers[$headerName] = $this->getRaw($headerName);
+        }
+
+        return $headers;
     }
 }

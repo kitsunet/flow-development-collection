@@ -35,7 +35,7 @@ class ControllerContext
     protected $request;
 
     /**
-     * @var Response
+     * @var ResponseInterface
      */
     protected $response;
 
@@ -59,11 +59,11 @@ class ControllerContext
      * Constructs this context
      *
      * @param RequestInterface $request
-     * @param Response $response
+     * @param ResponseInterface $response
      * @param Arguments $arguments
      * @param UriBuilder $uriBuilder
      */
-    public function __construct(RequestInterface $request, Response $response, Arguments $arguments, UriBuilder $uriBuilder)
+    public function __construct(RequestInterface $request, ResponseInterface $response, Arguments $arguments, UriBuilder $uriBuilder)
     {
         $this->request = $request;
         $this->response = $response;

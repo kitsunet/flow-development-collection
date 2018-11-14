@@ -12,7 +12,7 @@ namespace Neos\Flow\Mvc\Controller;
  */
 
 use Neos\Flow\Http\Helper\MediaTypeHelper;
-use Neos\Flow\Http\Response;
+use Neos\Flow\Mvc\ActionResponse;
 use Neos\Flow\Mvc\Exception\ForwardException;
 use Neos\Flow\Mvc\Exception\RequiredArgumentMissingException;
 use Neos\Flow\Mvc\Exception\StopActionException;
@@ -55,7 +55,7 @@ abstract class AbstractController implements ControllerInterface
 
     /**
      * The response which will be returned by this action controller
-     * @var Response
+     * @var ActionResponse
      * @api
      */
     protected $response;
@@ -108,6 +108,10 @@ abstract class AbstractController implements ControllerInterface
     {
         if (!$request instanceof ActionRequest) {
             throw new UnsupportedRequestTypeException(get_class($this) . ' only supports action requests – requests of type "' . get_class($request) . '" given.', 1187701131);
+        }
+
+        if (!$response instanceof ActionResponse) {
+            throw new UnsupportedRequestTypeException(get_class($this) . ' only supports action responses – response of type "' . get_class($request) . '" given.', 1542018797);
         }
 
         $this->request = $request;
@@ -266,7 +270,7 @@ abstract class AbstractController implements ControllerInterface
      * @throws StopActionException
      * @see forward()
      * @api
-     */
+     *
     protected function redirect($actionName, $controllerName = null, $packageKey = null, array $arguments = null, $delay = 0, $statusCode = 303, $format = null)
     {
         if ($packageKey !== null && strpos($packageKey, '\\') !== false) {

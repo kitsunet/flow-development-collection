@@ -14,6 +14,7 @@ namespace Neos\Flow\Http;
 use Neos\Flow\Annotations as Flow;
 use Neos\Utility\TypeHandling;
 use Psr\Http\Message\MessageInterface;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 
 /**
@@ -350,7 +351,7 @@ abstract class AbstractMessage implements MessageInterface
      * PSR-7 MessageInterface
      *
      * @param string $version HTTP protocol version
-     * @return self
+     * @return ResponseInterface
      */
     public function withProtocolVersion($version)
     {
