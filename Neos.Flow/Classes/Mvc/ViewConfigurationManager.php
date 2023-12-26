@@ -16,6 +16,9 @@ use Neos\Eel\Context;
 use Neos\Flow\Annotations as Flow;
 use Neos\Cache\Frontend\VariableFrontend;
 use Neos\Flow\Configuration\ConfigurationManager;
+use Neos\Flow\Mvc\Exception\ViewNotFoundException;
+use Neos\Flow\Mvc\View\ViewInterface;
+use Neos\Flow\ObjectManagement\ObjectManagerInterface;
 
 /**
  * A View Configuration Manager
@@ -41,9 +44,21 @@ class ViewConfigurationManager
 
     /**
      * @Flow\Inject
+     * @var ObjectManagerInterface
+     */
+    protected $objectManager;
+
+    /**
+     * @Flow\Inject
      * @var CompilingEvaluator
      */
     protected $eelEvaluator;
+
+    /**
+     * @Flow\InjectConfiguration(package="Neos.Flow", path="mvc.view.defaultImplementation")
+     * @var string
+     */
+    protected $defaultViewImplementation;
 
     /**
      * This method walks through the view configuration and applies
@@ -88,6 +103,56 @@ class ViewConfigurationManager
         }
 
         return $viewConfiguration;
+    }
+
+    public function resolveViewObjectNameForRequest(ActionRequest $actionRequest, ViewResolveConfiguration $viewResolveConfiguration): string
+    {
+        $viewsConfiguration = $this->getViewConfiguration($actionRequest);
+        return $viewsConfiguration['viewObjectName'] ?? $this->resolveViewObjectName($actionRequest, $viewResolveConfiguration);
+    }
+
+    /**
+     * Determines the fully qualified view object name.
+     *
+     * @return string The fully qualified view object name or false if no matching view could be found.
+     */
+    private function resolveViewObjectName(ActionRequest $request, ViewResolveConfiguration $viewResolveConfiguration): string
+    {
+        $possibleViewObjectName = $viewResolveConfiguration->viewObjectNamePattern;
+        $packageKey = $request->getControllerPackageKey();
+        $subpackageKey = $request->getControllerSubpackageKey();
+        $format = $request->getFormat();
+
+        if ($subpackageKey !== null && $subpackageKey !== '') {
+            $packageKey .= '\\' . $subpackageKey;
+        }
+        $possibleViewObjectName = str_replace([
+            '@package',
+            '@controller',
+            '@action'
+        ], [
+            str_replace('.', '\\', $packageKey),
+            $request->getControllerName(),
+            $request->getControllerActionName()
+        ], $possibleViewObjectName);
+
+        $viewObjectName = $this->objectManager->getCaseSensitiveObjectName(strtolower(str_replace('@format', $format, $possibleViewObjectName)));
+        if ($viewObjectName === null) {
+            $viewObjectName = $this->objectManager->getCaseSensitiveObjectName(strtolower(str_replace('@format', '', $possibleViewObjectName)));
+        }
+        if ($viewObjectName === null && isset($viewResolveConfiguration->viewFormatToObjectNameMap[$format])) {
+            $viewObjectName = $viewResolveConfiguration->viewFormatToObjectNameMap[$format];
+        }
+
+        if (empty($viewObjectName) && !empty($viewResolveConfiguration->defaultViewObjectName)) {
+            $viewObjectName = $viewResolveConfiguration->defaultViewObjectName;
+        }
+
+        if (empty($viewObjectName)) {
+            $viewObjectName = $this->defaultViewImplementation;
+        }
+
+        return $viewObjectName;
     }
 
     /**

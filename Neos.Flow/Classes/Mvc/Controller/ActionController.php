@@ -28,6 +28,7 @@ use Neos\Flow\Mvc\Exception\UnsupportedRequestTypeException;
 use Neos\Flow\Mvc\Exception\ViewNotFoundException;
 use Neos\Flow\Mvc\View\ViewInterface;
 use Neos\Flow\Mvc\ViewConfigurationManager;
+use Neos\Flow\Mvc\ViewResolveConfiguration;
 use Neos\Flow\ObjectManagement\ObjectManagerInterface;
 use Neos\Flow\Property\Exception\TargetNotFoundException;
 use Neos\Flow\Property\TypeConverter\Error\TargetNotFoundError;
@@ -668,31 +669,17 @@ class ActionController extends AbstractController
     /**
      * Determines the fully qualified view object name.
      *
-     * @return mixed The fully qualified view object name or false if no matching view could be found.
-     * @api
+     * @return string The fully qualified view object name or false if no matching view could be found.
+     * @deprecated
      */
-    protected function resolveViewObjectName()
+    protected function resolveViewObjectName(ActionRequest $request): string
     {
-        $possibleViewObjectName = $this->viewObjectNamePattern;
-        $packageKey = $this->request->getControllerPackageKey();
-        $subpackageKey = $this->request->getControllerSubpackageKey();
-        $format = $this->request->getFormat();
-
-        if ($subpackageKey !== null && $subpackageKey !== '') {
-            $packageKey .= '\\' . $subpackageKey;
-        }
-        $possibleViewObjectName = str_replace('@package', str_replace('.', '\\', $packageKey), $possibleViewObjectName);
-        $possibleViewObjectName = str_replace('@controller', $this->request->getControllerName(), $possibleViewObjectName);
-        $possibleViewObjectName = str_replace('@action', $this->request->getControllerActionName(), $possibleViewObjectName);
-
-        $viewObjectName = $this->objectManager->getCaseSensitiveObjectName(strtolower(str_replace('@format', $format, $possibleViewObjectName)));
-        if ($viewObjectName === null) {
-            $viewObjectName = $this->objectManager->getCaseSensitiveObjectName(strtolower(str_replace('@format', '', $possibleViewObjectName)));
-        }
-        if ($viewObjectName === null && isset($this->viewFormatToObjectNameMap[$format])) {
-            $viewObjectName = $this->viewFormatToObjectNameMap[$format];
-        }
-        return $viewObjectName;
+        return $this->viewConfigurationManager->resolveViewObjectNameForRequest($request, new ViewResolveConfiguration(
+            $this->defaultViewObjectName,
+            $this->viewObjectNamePattern,
+            $this->viewFormatToObjectNameMap
+        )
+        );
     }
 
     /**
