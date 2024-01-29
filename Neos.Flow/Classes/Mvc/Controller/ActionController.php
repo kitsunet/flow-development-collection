@@ -203,7 +203,7 @@ class ActionController extends AbstractController
      * Handles a request. The result output is returned by altering the given response.
      *
      * @param ActionRequest $request The request object
-     * @return ActionResponse
+     * @return ResponseInterface
      * @throws InvalidActionVisibilityException
      * @throws InvalidArgumentTypeException
      * @throws NoSuchActionException
@@ -215,7 +215,7 @@ class ActionController extends AbstractController
      * @throws \Neos\Flow\Security\Exception
      * @api
      */
-    public function processRequest(ActionRequest $request): ActionResponse
+    public function processRequest(ActionRequest $request): ResponseInterface
     {
         $response = new ActionResponse();
         $this->initializeController($request, $response);
@@ -261,13 +261,13 @@ class ActionController extends AbstractController
         }
 
         // We still use a global response here as it might have been changed in any of the steps above
-        $response = $this->callActionMethod($request, $this->response);
+        $httpResponse = $this->callActionMethod($request, $this->response);
 
-        if (!$response->hasContentType()) {
-            $response->setContentType($this->negotiatedMediaType);
+        if (!$httpResponse->hasHeader('Content-Type')) {
+            $httpResponse = $httpResponse->withHeader('Content-Type', $this->negotiatedMediaType);
         }
 
-        return $response;
+        return $httpResponse;
     }
 
     /**
@@ -516,9 +516,8 @@ class ActionController extends AbstractController
      *
      * @param ActionRequest $request
      * @param ActionResponse $response
-     * @return ActionResponse
      */
-    protected function callActionMethod(ActionRequest $request, ActionResponse $response): ActionResponse
+    protected function callActionMethod(ActionRequest $request, ActionResponse $response): ResponseInterface
     {
         $preparedArguments = [];
         foreach ($this->arguments as $argument) {
@@ -560,12 +559,12 @@ class ActionController extends AbstractController
         }
 
         if ($actionResult === null && $this->view instanceof ViewInterface) {
-            $this->response = $this->renderView($this->response);
+            return $this->renderView($this->response);
         } else {
             $this->response->setContent($actionResult);
         }
 
-        return $this->response;
+        return $this->response->buildHttpResponse();
     }
 
     /**
@@ -832,9 +831,8 @@ class ActionController extends AbstractController
      * Renders the view and applies the result to the response object.
      *
      * @param ActionResponse $response
-     * @return ActionResponse
      */
-    protected function renderView(ActionResponse $response): ActionResponse
+    protected function renderView(ActionResponse $response): ResponseInterface
     {
         $result = $this->view->render();
 
@@ -847,10 +845,7 @@ class ActionController extends AbstractController
         }
 
         if ($result instanceof ResponseInterface) {
-            $response->replaceHttpResponse($result);
-            if ($result->hasHeader('Content-Type')) {
-                $response->setContentType($result->getHeaderLine('Content-Type'));
-            }
+            return $result;
         }
 
         if (is_object($result) && is_callable([$result, '__toString'])) {
@@ -861,6 +856,6 @@ class ActionController extends AbstractController
             $response->setContent($result);
         }
 
-        return $response;
+        return $response->buildHttpResponse();
     }
 }

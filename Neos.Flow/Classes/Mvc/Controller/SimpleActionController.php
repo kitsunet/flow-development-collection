@@ -5,6 +5,7 @@ use Neos\Flow\Mvc\ActionRequest;
 use Neos\Flow\Mvc\ActionResponse;
 use Neos\Flow\Mvc\Exception\NoSuchActionException;
 use Neos\Flow\SignalSlot\Exception\InvalidSlotException;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Provides most direct access to our request/response abstraction,
@@ -20,15 +21,19 @@ class SimpleActionController implements ControllerInterface
 {
     /**
      * @param ActionRequest $request
-     * @return ActionResponse
+     * @return ResponseInterface
      * @throws NoSuchActionException
      * @throws InvalidSlotException
      */
-    public function processRequest(ActionRequest $request): ActionResponse
+    public function processRequest(ActionRequest $request): ResponseInterface
     {
         $request->setDispatched(true);
         $actionMethodName = $this->resolveActionMethodName($request);
-        return $this->$actionMethodName($request);
+        $response = $this->$actionMethodName($request);
+        if ($response instanceof ActionResponse) {
+            return $response->buildHttpResponse();
+        }
+        return $response;
     }
 
     /**
