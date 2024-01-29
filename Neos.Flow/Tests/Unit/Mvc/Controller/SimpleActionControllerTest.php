@@ -12,10 +12,10 @@ namespace Neos\Flow\Tests\Unit\Mvc\Controller;
  */
 
 use Neos\Flow\Mvc\ActionRequest;
-use Neos\Flow\Mvc\ActionResponse;
 use Neos\Flow\Mvc\Controller\SimpleActionController;
 use Neos\Flow\Mvc\Exception\NoSuchActionException;
 use Neos\Flow\Tests\UnitTestCase;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Tests for
@@ -65,9 +65,9 @@ class SimpleActionControllerTest extends UnitTestCase
 
         $testObject = new Fixtures\SimpleActionTestController();
         $response = $testObject->processRequest($request);
-        self::assertInstanceOf(ActionResponse::class, $response);
-        self::assertEquals('Simple', $response->getContent());
-        self::assertFalse($response->hasContentType());
+        self::assertInstanceOf(ResponseInterface::class, $response);
+        self::assertEquals('Simple', $response->getBody()->getContents());
+        self::assertEmpty($response->getHeaders());
         // default
         self::assertEquals(200, $response->getStatusCode());
     }
