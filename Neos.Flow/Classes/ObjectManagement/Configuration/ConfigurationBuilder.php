@@ -21,6 +21,8 @@ use Neos\Flow\ObjectManagement\Exception\InvalidObjectConfigurationException;
 use Neos\Flow\ObjectManagement\Exception\UnknownClassException;
 use Neos\Flow\ObjectManagement\Exception\UnresolvedDependenciesException;
 use Neos\Flow\ObjectManagement\ObjectManager;
+use Neos\Flow\Reflection\Exception\ClassLoadingForReflectionFailedException;
+use Neos\Flow\Reflection\Exception\InvalidClassException;
 use Neos\Flow\Reflection\ReflectionService;
 use Psr\Log\LoggerInterface;
 
@@ -155,8 +157,8 @@ class ConfigurationBuilder
                     throw new InvalidObjectConfigurationException('Tried to configure unknown object "' . $objectName . '" in package "' . $packageKey . '". Please check your Objects.yaml.', 1184926175);
                 }
 
-                if (!$isVirtualObject && $objectName !== $newObjectConfiguration->getClassName() && !interface_exists($objectName, true)) {
-                    throw new InvalidObjectConfigurationException('Tried to set a differing class name for class "' . $objectName . '" in the object configuration of package "' . $packageKey . '". Setting "className" is only allowed for interfaces, please check your Objects.yaml."', 1295954589);
+                if (!$isVirtualObject && class_exists($objectName) && $objectName !== $newObjectConfiguration->getClassName() && !interface_exists($objectName, true)) {
+                    $this->logger->warning('The class "%s" was configured to be injected as class "%s", this could be a misconfiguration and result in errors if the classes do not share common ancestry.');
                 }
 
                 if (empty($newObjectConfiguration->getClassName()) && !$newObjectConfiguration->isCreatedByFactory()) {
@@ -339,26 +341,40 @@ class ConfigurationBuilder
     protected function parsePropertyOfTypeObject($propertyName, $objectNameOrConfiguration, Configuration $parentObjectConfiguration)
     {
         if (is_array($objectNameOrConfiguration)) {
-            if (isset($objectNameOrConfiguration['name'])) {
-                $objectName = $objectNameOrConfiguration['name'];
-                unset($objectNameOrConfiguration['name']);
-            } else {
-                if (isset($objectNameOrConfiguration['factoryObjectName']) || isset($objectNameOrConfiguration['factoryMethodName'])) {
-                    $objectName = null;
-                } else {
-                    $annotations = $this->reflectionService->getPropertyTagValues($parentObjectConfiguration->getClassName(), $propertyName, 'var');
-                    if (count($annotations) !== 1) {
-                        throw new InvalidObjectConfigurationException(sprintf('Object %s (%s), for property "%s", contains neither object name, nor factory object name, and nor is the property properly @var - annotated.', $parentObjectConfiguration->getClassName(), $parentObjectConfiguration->getConfigurationSourceHint(), $propertyName), 1297097815);
-                    }
-                    $objectName = $annotations[0];
-                }
-            }
+            unset($objectNameOrConfiguration['name']);
+            $objectName = $this->resolveObjectName($parentObjectConfiguration->getClassName(), $propertyName, $objectNameOrConfiguration, $parentObjectConfiguration->getConfigurationSourceHint());
             $objectConfiguration = $this->parseConfigurationArray($objectName, $objectNameOrConfiguration, $parentObjectConfiguration->getConfigurationSourceHint() . ', property "' . $propertyName . '"');
             $property = new ConfigurationProperty($propertyName, $objectConfiguration, ConfigurationProperty::PROPERTY_TYPES_OBJECT);
         } else {
             $property = new ConfigurationProperty($propertyName, $objectNameOrConfiguration, ConfigurationProperty::PROPERTY_TYPES_OBJECT);
         }
         return $property;
+    }
+
+    /**
+     * @param class-string $definingClassName
+     * @param string $propertyName
+     * @param array $objectNameOrConfiguration
+     * @param string $configurationSourceHint
+     * @return string
+     * @throws InvalidObjectConfigurationException
+     * @throws ClassLoadingForReflectionFailedException
+     * @throws InvalidClassException
+     * @throws \ReflectionException
+     */
+    protected function resolveObjectName(string $definingClassName, string $propertyName, array $objectNameOrConfiguration, string $configurationSourceHint): string
+    {
+        if (isset($objectNameOrConfiguration['name'])) {
+            return $objectNameOrConfiguration['name'];
+        }
+
+        $objectName = $this->reflectionService->getPropertyType($definingClassName, $propertyName);
+        if ($objectName !== null) {
+            return $objectName;
+        }
+
+        $annotations = $this->reflectionService->getPropertyTagValues($definingClassName, $propertyName, 'var');
+        return $annotations[0] ?? '';
     }
 
     /**

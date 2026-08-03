@@ -19,8 +19,8 @@ use Neos\Flow\ObjectManagement\Configuration\Configuration as ObjectConfiguratio
 use Neos\Flow\ObjectManagement\Configuration\ConfigurationArgument as ObjectConfigurationArgument;
 use Neos\Flow\Core\ApplicationContext;
 use Neos\Flow\Annotations as Flow;
-use Neos\Flow\ObjectManagement\DependencyInjection\DependencyProxy;
 use Neos\Flow\Security\Context;
+use ReflectionClass;
 
 /**
  * Object Manager
@@ -39,6 +39,7 @@ class ObjectManager implements ObjectManagerInterface
     protected const KEY_CLASS_NAME = 'c';
     protected const KEY_PACKAGE = 'p';
     protected const KEY_LOWERCASE_NAME = 'l';
+    protected const KEY_OBJECTNAMES_PROVIDED = 'o';
 
     /**
      * The configuration context for this Flow run
@@ -58,11 +59,6 @@ class ObjectManager implements ObjectManagerInterface
      * @var array
      */
     protected array $objects = [];
-
-    /**
-     * @var array<DependencyInjection\DependencyProxy>
-     */
-    protected array $dependencyProxies = [];
 
     /**
      * @var array
@@ -110,6 +106,17 @@ class ObjectManager implements ObjectManagerInterface
      */
     public function setObjects(array $objects): void
     {
+        foreach ($objects as $objectName => $configuration) {
+            $className = $configuration[self::KEY_CLASS_NAME] ?? '';
+            if ($className === '' || !isset($objects[$className]) || $objectName === $configuration[self::KEY_CLASS_NAME]) {
+                continue;
+            }
+
+            if (interface_exists($objectName)) {
+                $objects[$className][self::KEY_OBJECTNAMES_PROVIDED][] = $objectName;
+            }
+        }
+
         $this->objects = $objects;
         $this->objects[ObjectManagerInterface::class][self::KEY_INSTANCE] = $this;
         $this->objects[get_class($this)][self::KEY_INSTANCE] = $this;
@@ -215,22 +222,43 @@ class ObjectManager implements ObjectManagerInterface
                 return $this->buildObjectByFactory($objectName);
             }
 
-            $this->objects[$objectName][self::KEY_INSTANCE] = $this->buildObjectByFactory($objectName);
-            return $this->objects[$objectName][self::KEY_INSTANCE];
+            $object = $this->buildObjectByFactory($objectName);
+            $className = get_class($object);
+            $this->objects[$objectName][self::KEY_INSTANCE] = $object;
+            if (($this->objects[$className][self::KEY_SCOPE] ?? null) === ObjectConfiguration::SCOPE_SINGLETON) {
+                $this->objects[$className][self::KEY_INSTANCE] = $object;
+                foreach ($this->objects[$className][self::KEY_OBJECTNAMES_PROVIDED] ?? [] as $providedObjectName) {
+                    $this->objects[$providedObjectName][self::KEY_INSTANCE] = $object;
+                }
+            }
+
+            return $object;
         }
 
+        /** @var class-string|false $className */
         $className = $this->getClassNameByObjectName($objectName);
         if ($className === false) {
             $hint = ($objectName[0] === '\\') ? ' Hint: You specified an object name with a leading backslash!' : '';
             throw new Exception\UnknownObjectException('Object "' . $objectName . '" is not registered.' . $hint, 1264589155);
         }
 
-        if (!isset($this->objects[$objectName]) || $this->objects[$objectName][self::KEY_SCOPE] === ObjectConfiguration::SCOPE_PROTOTYPE) {
-            return $this->instantiateClass($className, $constructorArguments);
+        $isPrototype = $this->isPrototype($objectName);
+        $internalClassAnchestry = $this->hasInternalClassInAnchestry($className);
+
+        $object = $this->createObjectInstance($className, !$internalClassAnchestry, $isPrototype ? $constructorArguments : []);
+        if ($isPrototype) {
+            return $object;
         }
 
-        $this->objects[$objectName][self::KEY_INSTANCE] = $this->instantiateClass($className, []);
-        return $this->objects[$objectName][self::KEY_INSTANCE];
+        $this->objects[$objectName][self::KEY_INSTANCE] = $object;
+        if ($this->objects[$className][self::KEY_SCOPE] === ObjectConfiguration::SCOPE_SINGLETON) {
+            $this->objects[$className][self::KEY_INSTANCE] = $object;
+            foreach ($this->objects[$className][self::KEY_OBJECTNAMES_PROVIDED] ?? [] as $providedObjectName) {
+                $this->objects[$providedObjectName][self::KEY_INSTANCE] = $object;
+            }
+        }
+
+        return $object;
     }
 
     /**
@@ -314,15 +342,13 @@ class ObjectManager implements ObjectManagerInterface
      * Returns the implementation class name for the specified object
      *
      * @param string $objectName The object name
-     * @return string|false The class name corresponding to the given object name or false if no such object is registered
+     * @return class-string|false The class name corresponding to the given object name or false if no such object is registered
      * @api
      */
     public function getClassNameByObjectName($objectName): string|false
     {
-        if (!isset($this->objects[$objectName])) {
-            return class_exists($objectName) ? $objectName : false;
-        }
-        return $this->objects[$objectName][self::KEY_CLASS_NAME] ?? $objectName;
+        $possibleName = $this->objects[$objectName][self::KEY_CLASS_NAME] ?? $objectName;
+        return class_exists($possibleName) ? $possibleName : false;
     }
 
     /**
@@ -389,49 +415,6 @@ class ObjectManager implements ObjectManagerInterface
     {
         return $this->objects[$objectName][self::KEY_INSTANCE] ?? null;
     }
-
-    /**
-     * This method is used internally to retrieve either an actual (singleton) instance
-     * of the specified dependency or, if no instance exists yet, a Dependency Proxy
-     * object which automatically triggers the creation of an instance as soon as
-     * it is used the first time.
-     *
-     * Internally used by the injectProperties method of generated proxy classes.
-     *
-     * @param string $hash
-     * @param mixed &$propertyReferenceVariable Reference of the variable to inject into once the proxy is activated
-     * @return object|null
-     */
-    public function getLazyDependencyByHash(string $hash, mixed &$propertyReferenceVariable): ?object
-    {
-        if (!isset($this->dependencyProxies[$hash])) {
-            return null;
-        }
-        $this->dependencyProxies[$hash]->_addPropertyVariable($propertyReferenceVariable);
-        return $this->dependencyProxies[$hash];
-    }
-
-    /**
-     * Creates a new DependencyProxy class for a dependency built through code
-     * identified through "hash" for a dependency of class $className. The
-     * closure in $builder contains code for actually creating the dependency
-     * instance once it needs to be materialized.
-     *
-     * Internally used by the injectProperties method of generated proxy classes.
-     *
-     * @param string $hash An md5 hash over the code needed to actually build the dependency instance
-     * @param mixed &$propertyReferenceVariable A first variable where the dependency needs to be injected into
-     * @param string $className Name of the class of the dependency which eventually will be instantiated
-     * @param \Closure $builder An anonymous function which creates the instance to be injected
-     * @return DependencyProxy
-     */
-    public function createLazyDependency(string $hash, mixed &$propertyReferenceVariable, string $className, \Closure $builder): DependencyProxy
-    {
-        $this->dependencyProxies[$hash] = new DependencyProxy($className, $builder);
-        $this->dependencyProxies[$hash]->_addPropertyVariable($propertyReferenceVariable);
-        return $this->dependencyProxies[$hash];
-    }
-
 
     /**
      * Unsets the instance of the given object
@@ -513,6 +496,9 @@ class ObjectManager implements ObjectManagerInterface
      */
     protected function buildObjectByFactory(string $objectName): object
     {
+        /** @var class-string|false $className */
+        $className = $this->getClassNameByObjectName($objectName);
+
         $factory = $this->objects[$objectName][self::KEY_FACTORY][0] ? $this->get($this->objects[$objectName][self::KEY_FACTORY][0]) : null;
         $factoryMethodName = $this->objects[$objectName][self::KEY_FACTORY][1];
 
@@ -532,10 +518,20 @@ class ObjectManager implements ObjectManagerInterface
         }
 
         if ($factory !== null) {
-            return $factory->$factoryMethodName(...$factoryMethodArguments);
+            $builder = static function () use ($factory, $factoryMethodName, $factoryMethodArguments): object {
+                return $factory->$factoryMethodName(...$factoryMethodArguments);
+            };
+        } else {
+            $builder = static function () use ($factoryMethodName, $factoryMethodArguments): object {
+                return $factoryMethodName(...$factoryMethodArguments);
+            };
         }
 
-        return $factoryMethodName(...$factoryMethodArguments);
+        if ($className && class_exists($className) && $this->hasInternalClassInAnchestry($className) === false) {
+            return $this->buildLazyProxy($className, $builder);
+        }
+
+        return $builder();
     }
 
     /**
@@ -575,5 +571,43 @@ class ObjectManager implements ObjectManagerInterface
             $methodName = $shutdownObjects[$object];
             $object->$methodName();
         }
+    }
+
+    protected function isPrototype(string $objectName): bool
+    {
+        return !isset($this->objects[$objectName]) || $this->objects[$objectName][self::KEY_SCOPE] === ObjectConfiguration::SCOPE_PROTOTYPE;
+    }
+
+    /**
+     * @param class-string $className
+     * @throws \ReflectionException
+     */
+    protected function hasInternalClassInAnchestry(string $className): bool
+    {
+        $reflectionClass = new \ReflectionClass($className);
+        $result = false;
+        while ($reflectionClass !== false) {
+            $result = $result || $reflectionClass->isInternal();
+            $reflectionClass = $reflectionClass->getParentClass();
+        }
+
+        return $result;
+    }
+
+    protected function createObjectInstance(string $className, bool $buildLazy, array $constructorArguments = []): object
+    {
+        // Lazy proxies do not support classes that are or inherit internal classes
+        if (!$buildLazy) {
+            return $this->instantiateClass($className, $constructorArguments);
+        }
+
+        return $this->buildLazyProxy($className, function () use ($className, $constructorArguments) {
+            return $this->instantiateClass($className, $constructorArguments);
+        });
+    }
+
+    protected function buildLazyProxy(string $className, \Closure $builder): object
+    {
+        return (new ReflectionClass($className))->newLazyProxy($builder);
     }
 }

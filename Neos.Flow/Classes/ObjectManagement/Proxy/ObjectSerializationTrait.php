@@ -15,7 +15,6 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\Persistence\Proxy as DoctrineProxy;
 use Neos\Flow\Core\Bootstrap;
 use Neos\Flow\ObjectManagement\Configuration\Configuration;
-use Neos\Flow\ObjectManagement\DependencyInjection\DependencyProxy;
 use Neos\Flow\Persistence\Aspect\PersistenceMagicInterface;
 use Neos\Flow\Persistence\PersistenceManagerInterface;
 use Neos\Utility\Arrays;
@@ -97,7 +96,7 @@ trait ObjectSerializationTrait
                     ];
                     continue;
                 }
-                if ($className !== false && (Bootstrap::$staticObjectManager->getScope($className) === Configuration::SCOPE_SINGLETON || $className === DependencyProxy::class)) {
+                if ($className !== false && (Bootstrap::$staticObjectManager->getScope($className) === Configuration::SCOPE_SINGLETON)) {
                     continue;
                 }
             }
